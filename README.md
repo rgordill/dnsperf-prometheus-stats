@@ -204,6 +204,28 @@ curl http://localhost:9090/api/v1/write
 
 The remote write endpoint will be available at: `http://prometheus-host:9090/api/v1/write`
 
+## Grafana Dashboard
+
+A sample Grafana dashboard is included in the `grafana/` directory. This dashboard provides visualizations for all the `dnsperf` metrics including:
+
+- Query rates and completion statistics
+- Latency percentiles and histograms
+- Response code breakdowns
+- Packet size metrics
+
+### Dashboard Preview
+
+![Grafana Dashboard](images/dnsperf-grafana.png)
+
+### Importing the Dashboard
+
+1. In Grafana, go to **Dashboards** → **Import**
+2. Click **Upload JSON file** and select `grafana/Performance with dnsperf-1764359872777.json`
+3. Select your Prometheus data source
+4. Click **Import**
+
+Alternatively, you can copy the JSON content and paste it into the import dialog.
+
 ## Requirements
 
 - Python 3.7+

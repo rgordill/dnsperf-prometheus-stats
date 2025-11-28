@@ -1,0 +1,37 @@
+global:
+  scrape_interval:     15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+
+# Storage configuration
+# Enable out-of-order sample ingestion to accept historical timestamps
+# This allows Prometheus to accept samples with timestamps that are older than
+# the most recent sample for a time series (Prometheus 2.39+)
+storage:
+  tsdb:
+    # Allow out-of-order samples up to 7 days old
+    # Adjust this value based on your needs (e.g., 24h, 168h, 720h)
+    out_of_order_time_window: 168h  # 7 days
+
+# Remote write receiver configuration
+# Prometheus can receive metrics via remote write protocol (Prometheus 2.33+)
+# To enable the remote write receiver, start Prometheus with:
+#   --web.enable-remote-write-receiver
+# 
+# Once enabled, metrics can be sent to:
+#   http://prometheus-host:9090/api/v1/write
+#
+# The remote write receiver accepts metrics in the Prometheus remote write format
+# and stores them in Prometheus's time series database.
+
+# Optional: Configure remote write to forward metrics to another Prometheus instance
+# remote_write:
+#   - url: "http://remote-prometheus:9090/api/v1/write"
+#     queue_config:
+#       max_samples_per_send: 1000
+#       batch_send_deadline: 5s
+#       max_retries: 3
+#     write_relabel_configs:
+#       - source_labels: [__name__]
+#         regex: 'dnsperf.*'
+#         action: keep
+

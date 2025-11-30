@@ -13,6 +13,7 @@ This tool parses `dnsperf` statistics output and converts them to Prometheus met
   - Latency metrics (average, stddev, histogram buckets)
 - Sends metrics via Prometheus remote write protocol
 - Supports dry-run mode for testing
+- Verbose mode to print all metrics with timestamps to stdout
 
 ## Installation
 
@@ -85,6 +86,21 @@ This file can then be processed by `dnsperf_to_prometheus.py`.
 
 ## Usage
 
+### Command-Line Arguments
+
+The `dnsperf_to_prometheus.py` script accepts the following arguments:
+
+**Required:**
+- `input_file` - Path to the dnsperf statistics file to parse
+- `--remote-write-url` - Prometheus remote write endpoint URL (e.g., `http://prometheus:9090/api/v1/write`)
+
+**Optional:**
+- `--remote-write-header` - Additional HTTP header for remote write requests (format: `Key=Value`). Can be specified multiple times.
+- `--instance-label` - Value for the `instance` label added to all metrics (default: `dnsperf`)
+- `--dry-run` - Parse and process metrics without sending them to the endpoint
+- `--verbose` - Print timestamp and metric information to stdout for each metric sent to Prometheus
+- `--debug-file` - Save the uncompressed payload data (before snappy compression) as JSON to the specified file for debugging
+
 ### Basic Usage
 
 ```bash
@@ -117,9 +133,48 @@ python dnsperf_to_prometheus.py input_file.txt \
   --dry-run
 ```
 
+### Verbose Output
+
+Use the `--verbose` flag to print each metric with its timestamp and value to stdout:
+
+```bash
+python dnsperf_to_prometheus.py input_file.txt \
+  --remote-write-url http://prometheus:9090/api/v1/write \
+  --verbose
+```
+
+The verbose output shows each metric being sent to Prometheus in the format:
+```
+<ISO timestamp> <metric_name>{<labels>} <value>
+```
+
+Example output:
+```
+2025-01-15T10:30:45.123456 dnsperf_packet_size_request_bytes{instance="dnsperf"} 64
+2025-01-15T10:30:45.123456 dnsperf_packet_size_response_bytes{instance="dnsperf"} 128
+2025-01-15T10:30:45.123456 dnsperf_queries_sent_total{instance="dnsperf"} 1000
+```
+
+This is useful for debugging or verifying which metrics are being sent and their values.
+
+### Debug File
+
+Use the `--debug-file` flag to save the uncompressed payload data (before snappy compression) as JSON to a file for debugging:
+
+```bash
+python dnsperf_to_prometheus.py input_file.txt \
+  --remote-write-url http://prometheus:9090/api/v1/write \
+  --debug-file debug-payload.json
+```
+
+This saves the complete Prometheus remote write payload in JSON format, which can be useful for debugging metric formatting, timestamps, or payload structure issues.
+
 ## Metrics Exported
 
 The following Prometheus metrics are created for each interval:
+
+**Info Metric:**
+- `dnsperf_info{...}` - Info metric containing dnsperf command line parameters as labels (sent once with the first interval timestamp). Labels include parameters extracted from the dnsperf command line such as `family`, `mode`, `server`, `port`, `clients`, `threads`, etc.
 
 **Counter Metrics (Cumulative):**
 - `dnsperf_queries_sent_total` - Cumulative total queries sent (accumulated across intervals)
@@ -128,7 +183,7 @@ The following Prometheus metrics are created for each interval:
 - `dnsperf_response_codes_total{code}` - Cumulative response count by code (accumulated across intervals)
 
 **Histogram Metrics (Prometheus Histogram):**
-- `dnsperf_latency_seconds_bucket{le}` - Latency histogram buckets with cumulative counts (accumulated across intervals)
+- `dnsperf_latency_bucket{le}` - Latency histogram buckets with cumulative counts (accumulated across intervals)
 - `dnsperf_latency_seconds_sum` - Cumulative sum of all latency values (accumulated across intervals)
 - `dnsperf_latency_seconds_count` - Cumulative count of latency observations (accumulated across intervals)
 
@@ -145,6 +200,7 @@ The following Prometheus metrics are created for each interval:
 **Note:** 
 - Metrics with `_total` suffix are cumulative counters that accumulate values across all intervals. Each interval adds its value to the running total from previous intervals. This follows Prometheus counter metric conventions.
 - `dnsperf_latency_seconds_sum` is calculated from latency buckets by using the midpoint of each bucket range multiplied by the count, then accumulated across intervals. This enables calculation of average latency using `rate(dnsperf_latency_seconds_sum[5m]) / rate(dnsperf_queries_completed_total[5m])`.
+- All metrics include an `instance` label with the value specified by `--instance-label` (default: `"dnsperf"`).
 
 ## Example
 

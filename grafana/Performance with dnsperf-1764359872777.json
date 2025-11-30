@@ -23,6 +23,121 @@
   "panels": [
     {
       "datasource": {
+        "uid": "ef3amk5yr943kf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 20,
+          "valueSize": 20
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.2.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "dnsperf_info",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Options",
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "keepLabels": [
+              "family",
+              "max_qps",
+              "mode",
+              "port",
+              "server",
+              "timelimit",
+              "clients"
+            ],
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "clients",
+                "family",
+                "max_qps",
+                "mode",
+                "port",
+                "server",
+                "stats_interval",
+                "timelimit"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "includeByName": {},
+            "indexByName": {
+              "clients": 4,
+              "family": 2,
+              "max_qps": 5,
+              "mode": 3,
+              "port": 1,
+              "server": 0,
+              "timelimit": 6
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
@@ -87,7 +202,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 4
       },
       "id": 1,
       "options": {
@@ -197,10 +312,6 @@
               {
                 "color": "green",
                 "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -212,7 +323,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 4
       },
       "id": 2,
       "options": {
@@ -236,7 +347,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "dnsperf_packet_size_request_bytes{instance=\"$instance\"}",
+          "expr": "last_over_time(dnsperf_packet_size_request_bytes{instance=\"$instance\"}[$__rate_interval])",
           "legendFormat": "request",
           "range": true,
           "refId": "A"
@@ -247,7 +358,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "dnsperf_queries_per_second{instance=\"$instance\"}",
+          "expr": "last_over_time(dnsperf_packet_size_response_bytes{instance=\"$instance\"}[$__rate_interval])",
           "hide": false,
           "instant": false,
           "legendFormat": "response",
@@ -319,54 +430,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "+stddev"
-            },
-            "properties": [
-              {
-                "id": "custom.fillBelowTo",
-                "value": "-stddev"
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 0
-              },
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": true,
-                  "tooltip": false,
-                  "viz": false
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "-stddev"
-            },
-            "properties": [
-              {
-                "id": "custom.lineWidth",
-                "value": 0
-              },
-              {
-                "id": "custom.drawStyle",
-                "value": "line"
-              },
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": true,
-                  "tooltip": false,
-                  "viz": false
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "0.95"
             },
             "properties": [
@@ -378,6 +441,21 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "0.99"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
@@ -385,7 +463,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 12
       },
       "id": 5,
       "options": {
@@ -409,36 +487,12 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "dnsperf_latency_seconds_avg{instance=\"$instance\"}",
-          "legendFormat": "avg",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "code",
-          "expr": "dnsperf_latency_seconds_avg{instance=\"$instance\"} + dnsperf_latency_seconds_stddev{instance=\"$instance\"}",
+          "expr": "histogram_quantile(0.5, sum(rate(dnsperf_latency_bucket{instance=\"$instance\"}[$__rate_interval])) by (le))",
           "hide": false,
           "instant": false,
-          "legendFormat": "+stddev",
+          "legendFormat": "0.5",
           "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "code",
-          "expr": "dnsperf_latency_seconds_avg{instance=\"$instance\"} - dnsperf_latency_seconds_stddev{instance=\"$instance\"}",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "-stddev",
-          "range": true,
-          "refId": "C"
+          "refId": "F"
         },
         {
           "datasource": {
@@ -452,6 +506,19 @@
           "legendFormat": "0.95",
           "range": true,
           "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum(rate(dnsperf_latency_bucket{instance=\"$instance\"}[$__rate_interval])) by (le))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "0.99",
+          "range": true,
+          "refId": "E"
         }
       ],
       "title": "Latency",
@@ -523,7 +590,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 8
+        "y": 12
       },
       "id": 3,
       "options": {
@@ -598,12 +665,12 @@
     ]
   },
   "time": {
-    "from": "2025-11-27T14:58:10.340Z",
-    "to": "2025-11-27T14:59:16.892Z"
+    "from": "2025-11-30T00:41:36.895Z",
+    "to": "2025-11-30T00:44:49.856Z"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Performance with dnsperf",
   "uid": "ad989qv",
-  "version": 32
+  "version": 43
 }

@@ -2,8 +2,9 @@
 
 import re
 import sys
-from typing import List, Optional, Dict
-from datetime import datetime, timedelta
+from typing import List, Optional, Dict, Union
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from .models import IntervalStats
 from .utils import BUCKET_UPPER_BOUND_PATTERN
@@ -12,8 +13,15 @@ from .utils import BUCKET_UPPER_BOUND_PATTERN
 class DnsperfParser:
     """Parser for dnsperf statistics output."""
     
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, timezone: Union[ZoneInfo, timezone] = timezone.utc):
+        """Initialize the parser.
+        
+        Args:
+            file_path: Path to the dnsperf statistics file
+            timezone: Timezone of timestamps in the dnsperf file (default: UTC)
+        """
         self.file_path = file_path
+        self.timezone = timezone
         self.intervals: List[IntervalStats] = []
         self.start_time: Optional[datetime] = None
         self.command_line_labels: Dict[str, str] = {}
@@ -26,28 +34,32 @@ class DnsperfParser:
         # Parse command line to extract parameters as labels
         self.command_line_labels = self._parse_command_line(content)
         
-        # Parse the start timestamp
+        # Parse the start timestamp and apply the configured timezone
         start_time_match = re.search(r'\[Status\] Started at:\s+(.+)', content)
         if start_time_match:
             start_time_str = start_time_match.group(1).strip()
             # Parse format like "Thu Nov 27 15:58:14 2025"
             try:
                 # Try common date formats
+                parsed_time = None
                 for fmt in ['%a %b %d %H:%M:%S %Y', '%a %b %d %H:%M:%S %Y %Z']:
                     try:
-                        self.start_time = datetime.strptime(start_time_str, fmt)
+                        parsed_time = datetime.strptime(start_time_str, fmt)
                         break
                     except ValueError:
                         continue
-                if self.start_time is None:
+                if parsed_time is not None:
+                    # Apply the configured timezone to the parsed time
+                    self.start_time = parsed_time.replace(tzinfo=self.timezone)
+                else:
                     print(f"Warning: Could not parse start time '{start_time_str}', using current time", file=sys.stderr)
-                    self.start_time = datetime.now()
+                    self.start_time = datetime.now(self.timezone)
             except Exception as e:
                 print(f"Warning: Error parsing start time: {e}, using current time", file=sys.stderr)
-                self.start_time = datetime.now()
+                self.start_time = datetime.now(self.timezone)
         else:
             print("Warning: Could not find start time, using current time", file=sys.stderr)
-            self.start_time = datetime.now()
+            self.start_time = datetime.now(self.timezone)
         
         # Stop parsing at "[Status] Testing complete" to avoid the final summary section
         # Split content at the testing complete marker

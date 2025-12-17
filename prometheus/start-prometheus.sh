@@ -2,11 +2,71 @@
 # Start Prometheus with remote write receiver enabled
 # This allows Prometheus to receive metrics via the remote write protocol
 
-CONFIG_FILE="${1:-prometheus.remote-write.yml}"
+set -e
+
+# Default values
+CONFIG_FILE="prometheus.remote-write.yml"
+DATA_DIR=""
 PROMETHEUS_VERSION="${PROMETHEUS_VERSION:-latest}"
+
+# Usage function
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Start Prometheus with remote write receiver enabled.
+
+Options:
+    --config=FILE       Path to Prometheus config file (default: prometheus.remote-write.yml)
+    --data-dir=DIR      Path to persistent data directory (optional)
+                        If not specified, data is stored inside the container
+    --version=VERSION   Prometheus version to use (default: latest)
+    --help              Show this help message and exit
+
+Environment Variables:
+    PROMETHEUS_VERSION  Prometheus container image version (default: latest)
+
+Examples:
+    $(basename "$0")
+    $(basename "$0") --config=/path/to/prometheus.yml
+    $(basename "$0") --config=myconfig.yml --data-dir=/var/lib/prometheus
+    $(basename "$0") --data-dir=./prometheus-data --version=v2.47.0
+
+EOF
+    exit "${1:-0}"
+}
+
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --config=*)
+            CONFIG_FILE="${1#*=}"
+            shift
+            ;;
+        --data-dir=*)
+            DATA_DIR="${1#*=}"
+            shift
+            ;;
+        --version=*)
+            PROMETHEUS_VERSION="${1#*=}"
+            shift
+            ;;
+        --help|-h)
+            usage 0
+            ;;
+        *)
+            echo "Error: Unknown option: $1" >&2
+            echo "" >&2
+            usage 1
+            ;;
+    esac
+done
 
 echo "Starting Prometheus with remote write receiver enabled..."
 echo "Config file: $CONFIG_FILE"
+if [ -n "$DATA_DIR" ]; then
+    echo "Data directory: $DATA_DIR"
+fi
 echo ""
 
 # Check if running in Docker/Podman
@@ -77,10 +137,53 @@ fi
 # Start Prometheus container with remote write receiver enabled
 # Note: Out-of-order sample ingestion is configured in prometheus.yml
 # via storage.tsdb.out_of_order_time_window (requires Prometheus 2.39+)
+
+# Build volume arguments
+VOLUME_ARGS=(-v "$CONFIG_PATH:/etc/prometheus/prometheus.yml$VOLUME_OPTION")
+
+# Add data directory volume if specified
+if [ -n "$DATA_DIR" ]; then
+    # Get absolute path to data directory
+    if [[ "$DATA_DIR" != /* ]]; then
+        DATA_DIR="$(pwd)/$DATA_DIR"
+    fi
+    
+    # Create data directory if it doesn't exist
+    if [ ! -d "$DATA_DIR" ]; then
+        echo "Creating data directory: $DATA_DIR"
+        mkdir -p "$DATA_DIR"
+    fi
+    
+    # Determine data volume option (needs write access)
+    # Podman: use :U to auto-chown to match container user (nobody/65534)
+    # Also use :Z for SELinux if enforcing
+    DATA_VOLUME_OPTION=":rw"
+    if [ "$CONTAINER_CMD" = "podman" ]; then
+        if [ -n "$(getenforce 2>/dev/null)" ] && [ "$(getenforce)" = "Enforcing" ]; then
+            DATA_VOLUME_OPTION=":rw,Z,U"
+        else
+            DATA_VOLUME_OPTION=":rw,U"
+        fi
+    elif [ "$CONTAINER_CMD" = "docker" ]; then
+        # Docker: need to manually set ownership to 65534:65534 (nobody)
+        echo "Setting ownership of data directory for Docker..."
+        chown -R 65534:65534 "$DATA_DIR" 2>/dev/null || sudo chown -R 65534:65534 "$DATA_DIR"
+        if command -v getenforce &> /dev/null && [ "$(getenforce)" = "Enforcing" ]; then
+            DATA_VOLUME_OPTION=":rw,Z"
+        fi
+    fi
+    
+    echo "Using data directory: $DATA_DIR"
+    echo "Data volume option: $DATA_VOLUME_OPTION"
+    echo ""
+    
+    VOLUME_ARGS+=(-v "$DATA_DIR:/prometheus$DATA_VOLUME_OPTION")
+fi
+
 $CONTAINER_CMD run -d \
     --name prometheus-remote-write \
     -p 9090:9090 \
-    -v "$CONFIG_PATH:/etc/prometheus/prometheus.yml$VOLUME_OPTION" \
+    "${VOLUME_ARGS[@]}" \
     quay.io/prometheus/prometheus:$PROMETHEUS_VERSION \
     --config.file=/etc/prometheus/prometheus.yml \
     --storage.tsdb.path=/prometheus \

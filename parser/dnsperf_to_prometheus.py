@@ -7,6 +7,7 @@ then send them using Prometheus remote write.
 import sys
 import os
 import argparse
+from zoneinfo import ZoneInfo
 
 # Handle both relative imports (when used as module) and absolute imports (when run as script)
 try:
@@ -56,12 +57,25 @@ def main():
         '--debug-file',
         help='Save the uncompressed payload data (before snappy compression) as JSON to the specified file for debugging'
     )
+    parser.add_argument(
+        '--timezone',
+        default='UTC',
+        help='Timezone of timestamps in the dnsperf file (default: UTC). Use IANA timezone names like "Europe/Madrid", "America/New_York", "UTC"'
+    )
     
     args = parser.parse_args()
     
+    # Validate timezone
+    try:
+        tz = ZoneInfo(args.timezone)
+    except Exception as e:
+        print(f"Error: Invalid timezone '{args.timezone}': {e}", file=sys.stderr)
+        sys.exit(1)
+    
     # Parse dnsperf stats
     print(f"Parsing dnsperf statistics from {args.input_file}...")
-    dnsperf_parser = DnsperfParser(args.input_file)
+    print(f"Using timezone: {args.timezone}")
+    dnsperf_parser = DnsperfParser(args.input_file, timezone=tz)
     intervals = dnsperf_parser.parse()
     
     if not intervals:
